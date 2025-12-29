@@ -1,3 +1,4 @@
-import numpy as np
-import pandas as pd
+'''
+Solver application for user to utilize during a Wordle game
+'''
 

@@ -1,3 +1,7 @@
+'''
+Simulator for Wordle's game mechanics to be used in simulation (solver.py)
+'''
+
 from collections import Counter
 
 # Examples for edge case yellows:
