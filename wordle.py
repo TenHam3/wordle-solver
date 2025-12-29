@@ -16,6 +16,12 @@ from collections import Counter
 # MASKS is guess - XXGXY
 # ISLES is guess - GGXYY
 
+# SPEED is guess (not the word)
+# ABIDE is word - SPEED's evaluations would be XXYXY
+# ERASE is word - SPEED's evaluations would be YXYYX
+# STEAL is word - SPEED's evaluations would be GXGXX
+# CREPE is word - SPEED's evaluations would be XYGYX
+
 # G - green, Y - yellow, X - gray
 def word_eval(word, guess):
     # Count occurrences of each letter in the target word
