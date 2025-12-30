@@ -31,15 +31,17 @@ EXACT = np.uint8(2)
 
 def string_to_pattern_int(pattern_string):
     # Converts ternary pattern string (base 3) to decimal (base 10) int
-    return int(pattern_string, 3)
+    return sum((3**(len(pattern_string) - i - 1)) * int(c) for i, c in enumerate(pattern_string))
 
 
 def pattern_int_to_string(pattern):
     string = []
-    while pattern > 0:
-        pattern, remainder = divmod(pattern, 3)
-        string.append(remainder)
-    return string.reverse()
+    curr = pattern
+    # Convert decimal (base 10) int to ternary pattern string (base 3)
+    for i in range(5):
+        string.append(curr % 3)
+        curr //= 3
+    return string[::-1]
 
 def get_emoji_pattern(pattern):
     d = {MISS: "⬛", MISPLACED: "🟨", EXACT: "🟩"}
@@ -48,7 +50,7 @@ def get_emoji_pattern(pattern):
 def word_eval(word, guess):
     # Count occurrences of each letter in the target word
     counts = Counter(word)
-    res = ['X'] * 5
+    res = [MISS] * 5
 
     # First pass for greens, possible yellows, and grays
     for i in range(len(guess)):
@@ -56,7 +58,7 @@ def word_eval(word, guess):
         if counts[curr] > 0:
             if word[i] == curr:
                 # Green, correct position
-                res[i] = 'G'
+                res[i] = EXACT
                 counts[curr] -= 1
             else:
                 # May be yellow, mark as M for now
@@ -69,10 +71,10 @@ def word_eval(word, guess):
         if res[i] == 'M':
             curr = guess[i]
             if counts[curr] > 0:
-                res[i] = 'Y'
+                res[i] = MISPLACED
                 counts[curr] -= 1
             else:
-                res[i] = 'X'
+                res[i] = MISS
     
     return res
 
@@ -87,3 +89,13 @@ def simulate_game(word, guesses):
         return evaluations, len(guesses)
     else:
         return evaluations, len(guesses) + 1  # +1 for failure
+
+word = "SISSY"
+guess = "SPILL" 
+evaluation = word_eval(word, guess)
+pattern_int = string_to_pattern_int(evaluation)
+pattern_string = pattern_int_to_string(pattern_int)
+print(f"Word: {word}, Guess: {guess}, Evaluation: {evaluation}")
+print(f"Pattern Int: {pattern_int}")
+print(f"Pattern String: {pattern_string}")
+print(f"Emoji Pattern: {get_emoji_pattern(pattern_int)}")
