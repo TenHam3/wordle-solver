@@ -28,11 +28,12 @@ def main():
         pattern_matrix = generate_pattern_matrix(all_words, all_words)
         np.save('./data/pattern_matrix.npy', pattern_matrix)
 
-    print(all_words[10170]) # slate
-    print(get_entropy(10170, pattern_matrix))
-
-    print(all_words[12358]) # weary
-    print(get_entropy(12358, pattern_matrix))
+    entropies = {}
+    for i, word in enumerate(all_words):
+        entropies[word] = get_entropy(i, pattern_matrix)
+    
+    with open('./data/entropies.json', 'w') as f:
+        json.dump(entropies, f)
 
     # Calculate expected information gain for each guess in allowed words
 
