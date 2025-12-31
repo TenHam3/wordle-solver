@@ -16,6 +16,11 @@ test_words = np.loadtxt('./data/test.txt', dtype=str)
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
 possible_words = np.loadtxt('./data/possible_words.txt', dtype=str)
 
+if not os.path.exists('./data/word_indices.json'):
+    with open('./data/word_indices.json', 'w') as f:
+        word_indices = {word: i for i, word in enumerate(all_words)}
+        json.dump(word_indices, f)
+
 NUM_ALLOWED = len(all_words)
 NUM_POSSIBLE = len(possible_words)
 
@@ -41,11 +46,6 @@ def main():
 
     entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
     print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
-
-    # Calculate expected information gain for each guess in allowed words
-
-    # Store results in a DataFrame and export to JSON for easy lookup during solving
-    # Maps guesses to expected info gain
     
     return
 
@@ -112,8 +112,8 @@ def generate_pattern_matrix(words1, words2):
             equality_grid[:, :, k, j].flat[matches] = False
             equality_grid[:, :, i, k].flat[matches] = False
 
-    # Rather than representing a color pattern as a lists of integers,
-    # store it as a single integer, whose ternary representations corresponds
+    # Rather than representing a color pattern as a list of integers,
+    # store it as a single integer, whose ternary representation corresponds
     # to that list of integers.
     pattern_matrix = np.dot(
         full_pattern_matrix,
@@ -122,14 +122,11 @@ def generate_pattern_matrix(words1, words2):
 
     return pattern_matrix
 
-def get_entropy(guess, pattern_matrix):
-    info_gain = 0.0
-
-    patterns, counts = np.unique(pattern_matrix[guess], return_counts=True)
+def get_entropy(guess, pattern_matrix, remaining_indices=None):
+    patterns = pattern_matrix[guess, remaining_indices]
+    patterns, counts = np.unique(patterns, return_counts=True)
     probs = counts / counts.sum()
-    info_gain = -np.sum(probs * np.log2(probs))
-
-    return info_gain
+    return -np.sum(probs * np.log2(probs))
 
 if __name__ == "__main__":
     main()
