@@ -118,7 +118,6 @@ def generate_pattern_matrix(words1, words2):
 def get_entropy(guess, pattern_matrix):
     info_gain = 0.0
 
-    # Iterate through each possible pattern and add its contribution to info gain
     patterns, counts = np.unique(pattern_matrix[guess], return_counts=True)
     probs = counts / counts.sum()
     info_gain = -np.sum(probs * np.log2(probs))
