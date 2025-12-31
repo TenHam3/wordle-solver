@@ -21,19 +21,26 @@ NUM_POSSIBLE = len(possible_words)
 
 def main():
     # Get pattern matrix (check if already saved in file first)
-
     if os.path.exists('./data/pattern_matrix.npy'):
         pattern_matrix = np.load('./data/pattern_matrix.npy')
     else:
         pattern_matrix = generate_pattern_matrix(all_words, all_words)
         np.save('./data/pattern_matrix.npy', pattern_matrix)
 
-    entropies = {}
-    for i, word in enumerate(all_words):
-        entropies[word] = get_entropy(i, pattern_matrix)
-    
-    with open('./data/entropies.json', 'w') as f:
-        json.dump(entropies, f)
+    # Get entropies (check if already saved in file first)
+    if os.path.exists('./data/entropies.json'):
+        with open('./data/entropies.json', 'r') as f:
+            entropies = json.load(f)
+    else:
+        entropies = {}
+        for i, word in enumerate(all_words):
+            entropies[word] = get_entropy(i, pattern_matrix)
+        
+        with open('./data/entropies.json', 'w') as f:
+            json.dump(entropies, f)
+
+    entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
+    print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
 
     # Calculate expected information gain for each guess in allowed words
 
