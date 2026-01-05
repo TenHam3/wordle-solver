@@ -14,7 +14,7 @@ from wordle import *
 
 test_words = np.loadtxt('./data/test.txt', dtype=str)
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
-possible_words = np.loadtxt('./data/possible_words.txt', dtype=str)
+possible_words = np.loadtxt('./data/solutions.txt', dtype=str)
 
 if not os.path.exists('./data/word_indices.json'):
     with open('./data/word_indices.json', 'w') as f:

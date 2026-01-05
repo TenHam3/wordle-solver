@@ -49,6 +49,8 @@ def get_emoji_pattern(pattern):
 
 def word_eval(word, guess):
     # Count occurrences of each letter in the target word
+    word = word.lower()
+    guess = guess.lower()
     counts = Counter(word)
     res = [MISS] * 5
 
