@@ -43,32 +43,32 @@ def main():
         return
     
     # Test a random or particular word
-    # answer = random.choice(possible_words)
-    # answer = "WATER"
-    # play_game(answer, pattern_matrix, entropies, word_indices)
+    answer = random.choice(possible_words)
+    answer = "WATER"
+    play_game(answer, pattern_matrix, entropies, word_indices)
 
     # Test against all words
-    attempt_count = {}
-    max_attempts = 0
-    worst_words = set()
-    for answer in possible_words:
-        score = play_game(answer, pattern_matrix, entropies, word_indices)
-        attempt_count[score] = attempt_count.get(score, 0) + 1
+    # attempt_count = {}
+    # max_attempts = 0
+    # worst_words = set()
+    # for answer in possible_words:
+    #     score = play_game(answer, pattern_matrix, entropies, word_indices)
+    #     attempt_count[score] = attempt_count.get(score, 0) + 1
         
-        if score > max_attempts: 
-            worst_words = set()
-            worst_words.add(str(answer))
-        elif score == max_attempts:
-            worst_words.add(str(answer))
+    #     if score > max_attempts: 
+    #         worst_words = set()
+    #         worst_words.add(str(answer))
+    #     elif score == max_attempts:
+    #         worst_words.add(str(answer))
         
-        max_attempts = max(max_attempts, score)
+    #     max_attempts = max(max_attempts, score)
 
-    print(f"Attempt distribution over all possible words:\n")
-    keys = sorted(attempt_count.keys())
-    for k in keys:
-        print(f"{k} attempts: {attempt_count[k]}")
+    # print(f"Attempt distribution over all possible words:\n")
+    # keys = sorted(attempt_count.keys())
+    # for k in keys:
+    #     print(f"{k} attempts: {attempt_count[k]}")
     
-    print(f"Worst words were {worst_words} with {max_attempts} attempts.")
+    # print(f"Worst words were {worst_words} with {max_attempts} attempts.")
 
 def play_game(answer, pattern_matrix, entropies, word_indices):
     print(f"Answer is {answer}")
@@ -98,8 +98,8 @@ def play_game(answer, pattern_matrix, entropies, word_indices):
                     possible_indices.append(word_index)
             
             possible_words_filtered = all_words[possible_indices]
-            print(f"{len(possible_words_filtered)} possible words remaining.")
             print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(possible_words_filtered)} possible solution words remaining.")
 
             if len(possible_words_filtered) == 0:
                 print("No possible words remaining. Something went wrong.")
