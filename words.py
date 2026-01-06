@@ -1,3 +1,7 @@
+"""
+Generates allowed words list based on the predicted updated solution set obtained by the scraper
+"""
+
 import numpy as np
 
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)

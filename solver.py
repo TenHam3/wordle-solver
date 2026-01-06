@@ -49,8 +49,11 @@ def main():
 
     # Test manually against a random word or particular word
     # answer = random.choice(possible_words)
-    answer = "OOMPH"
-    play_game_piloted(answer, pattern_matrix, entropies, word_indices)
+    # answer = "OOMPH"
+    # play_game_piloted(answer, pattern_matrix, entropies, word_indices)
+
+    # Test manually from user-given Wordle feedback
+    play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
 
     # Test against all words
     # attempt_count = {}
@@ -168,6 +171,77 @@ def play_game_piloted(answer, pattern_matrix, entropies, word_indices):
                 idx = word_indices[word]
                 entropies_copy[word] = get_entropy(idx, pattern_matrix, possible_indices)
 
+    return score
+
+def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
+    guesses = set()
+    entropies_copy = entropies.copy() 
+    score = 0
+    for i in range(6):
+            score += 1
+            candidates = {w: e for w, e in entropies_copy.items() if w not in guesses}
+            suggested_guess = max(candidates, key=candidates.get)
+            user_guess = ""
+            while len(user_guess) != 5 or user_guess.upper() not in all_words:
+                user_guess = input(f"Enter a guess (suggested best guess is {suggested_guess}): ")
+                if len(user_guess) != 5:
+                    print("Please enter a 5-letter word")
+                elif user_guess.upper() not in all_words:
+                    print("Not a valid word")
+            
+            guesses.add(user_guess)
+
+            pattern = ""
+            allowed_chars = {"G", "g", "Y", "y", "X", "x"}
+            diff = {}
+            while len(pattern) != 5 or diff:
+                pattern = input("Provide the color pattern given by Wordle (G/g - green, Y/y - yellow, X/x - gray): ")
+                diff = set(pattern) - allowed_chars
+                if len(pattern) != 5:
+                    print("Please enter a pattern of length 5")
+                elif diff:
+                    print("Please input a valid pattern given from Wordle feedback (G/g - green, Y/y - yellow, X/x - gray)")
+
+            pattern = list(pattern)
+            for j in range(len(pattern)):
+                c = pattern[j]
+                if c.upper() == 'G':
+                    pattern[j] = EXACT
+                elif c.upper() == 'Y':
+                    pattern[j] = MISPLACED
+                else:
+                    pattern[j] = MISS
+
+            pattern_int = string_to_pattern_int(pattern)
+            emoji_pattern = get_emoji_pattern(pattern_int)
+            print(f"Guess {i+1}: {user_guess} -> {emoji_pattern}")
+
+            if pattern_int == 242: # 242 means pattern is all 2's (green) so they guessed correctly
+                print(f"Solved! The word was {user_guess.upper()}.")
+                break
+
+            # Filter possible words based on the pattern
+            possible_indices = []
+            guess_index = word_indices[user_guess.upper()]
+            for word in all_words:
+                word_index = word_indices[word]
+                if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
+                    possible_indices.append(word_index)
+            
+            possible_words_filtered = all_words[possible_indices]
+            print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(possible_words_filtered)} possible solution words remaining.")
+
+            if len(possible_words_filtered) == 0:
+                print("No possible words remaining. Something went wrong.")
+                break
+
+            # Update entropies for the next guess
+            entropies_copy = {}
+            for word in possible_words_filtered:
+                idx = word_indices[word]
+                entropies_copy[word] = get_entropy(idx, pattern_matrix, possible_indices)
+    
     return score
 
 if __name__ == "__main__":
