@@ -26,5 +26,5 @@ with WolframLanguageSession(kernel=kernel_path) as session:
             freqs[word] = 0.0
         print(f"Frequency of {word}: {freqs[word]}")
         
-    with open('./data/word_freq2.json', 'w') as f:
+    with open('./data/word_freq_updated.json', 'w') as f:
         json.dump(freqs, f)

@@ -42,10 +42,15 @@ def main():
         print("Need to generate entropies first. Run simulator.py")
         return
     
-    # Test a random or particular word
-    answer = random.choice(possible_words)
-    answer = "FLOAT"
-    play_game(answer, pattern_matrix, entropies, word_indices)
+    # Test bot against a random or particular word
+    # answer = random.choice(possible_words)
+    # answer = "FLOAT"
+    # play_game_bot(answer, pattern_matrix, entropies, word_indices)
+
+    # Test manually against a random word or particular word
+    # answer = random.choice(possible_words)
+    answer = "OOMPH"
+    play_game_piloted(answer, pattern_matrix, entropies, word_indices)
 
     # Test against all words
     # attempt_count = {}
@@ -70,7 +75,7 @@ def main():
     
     # print(f"Worst words were {worst_words} with {max_attempts} attempts.")
 
-def play_game(answer, pattern_matrix, entropies, word_indices):
+def play_game_bot(answer, pattern_matrix, entropies, word_indices):
     print(f"Answer is {answer}")
     guess = ""
     i = 0
@@ -113,6 +118,57 @@ def play_game(answer, pattern_matrix, entropies, word_indices):
             i += 1
 
     return i + 1
+
+def play_game_piloted(answer, pattern_matrix, entropies, word_indices):
+    print(f"Answer is {answer}")
+    guesses = set()
+    entropies_copy = entropies.copy() 
+    score = 0
+    for i in range(6):
+            score += 1
+            candidates = {w: e for w, e in entropies_copy.items() if w not in guesses}
+            suggested_guess = max(candidates, key=candidates.get)
+            user_guess = ""
+            while len(user_guess) != 5 or user_guess.upper() not in all_words:
+                user_guess = input(f"Enter a guess (suggested best guess is {suggested_guess}): ")
+                if len(user_guess) != 5:
+                    print("Please enter a 5-letter word")
+                elif user_guess.upper() not in all_words:
+                    print("Not a valid word")
+            
+            guesses.add(user_guess)
+            pattern = word_eval(answer, user_guess)
+            pattern_int = string_to_pattern_int(pattern)
+            emoji_pattern = get_emoji_pattern(pattern_int)
+            print(f"Guess {i+1}: {user_guess} -> {emoji_pattern}")
+
+            if user_guess.lower() == answer.lower():
+                print(f"Solved! The word was {answer}.")
+                break
+
+            # Filter possible words based on the pattern
+            possible_indices = []
+            guess_index = word_indices[user_guess.upper()]
+            for word in all_words:
+                word_index = word_indices[word]
+                if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
+                    possible_indices.append(word_index)
+            
+            possible_words_filtered = all_words[possible_indices]
+            print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(possible_words_filtered)} possible solution words remaining.")
+
+            if len(possible_words_filtered) == 0:
+                print("No possible words remaining. Something went wrong.")
+                break
+
+            # Update entropies for the next guess
+            entropies_copy = {}
+            for word in possible_words_filtered:
+                idx = word_indices[word]
+                entropies_copy[word] = get_entropy(idx, pattern_matrix, possible_indices)
+
+    return score
 
 if __name__ == "__main__":
     main()

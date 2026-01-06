@@ -141,6 +141,20 @@ def get_entropy(guess, pattern_matrix, remaining_indices=None):
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+# Possible cutoff point at line 6489 (PIKER) of sorted_by_freqs.txt, BASSY (next word) not in solutions
+def get_freq_probs(freqs, n=3000, width=10):
+    sorted_words = sorted(freqs.keys, key=freqs.get)
+    center = width * ( -0.5 + (n / len(sorted_words)) )
+    linspace = np.linspace(center - width / 2, center + width / 2, len(sorted_words))
+
+    probs = {}
+    for word, x in zip(sorted_words, linspace):
+        probs[word] = sigmoid(x)
     
+    return probs
+
+
+
 if __name__ == "__main__":
     main()
