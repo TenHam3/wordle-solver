@@ -44,8 +44,19 @@ def main():
         with open('./data/entropies.json', 'w') as f:
             json.dump(entropies, f)
 
-    entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
-    print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
+    # Get relative frequencies
+    frequencies = {}
+    if os.path.exists('./data/word_freq_updated.json'):
+        with open('./data/word_freq_updated.json', 'r') as f:
+            frequencies = json.load(f)
+    else:
+        print("Need relative word frequency data")
+        return
+
+    sorted_by_freqs = sorted(frequencies.keys(), key=frequencies.get)
+
+    # entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
+    # print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
     
     return
 
@@ -128,5 +139,8 @@ def get_entropy(guess, pattern_matrix, remaining_indices=None):
     probs = counts / counts.sum()
     return -np.sum(probs * np.log2(probs))
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+    
 if __name__ == "__main__":
     main()

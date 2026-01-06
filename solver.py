@@ -44,7 +44,7 @@ def main():
     
     # Test a random or particular word
     answer = random.choice(possible_words)
-    answer = "WATER"
+    answer = "FLOAT"
     play_game(answer, pattern_matrix, entropies, word_indices)
 
     # Test against all words
