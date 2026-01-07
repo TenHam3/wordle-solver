@@ -10,13 +10,17 @@ import json
 import time
 import itertools as it
 import os
+from scipy.stats import entropy
 from wordle import *
 
 test_words = np.loadtxt('./data/test.txt', dtype=str)
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
 possible_words = np.loadtxt('./data/solutions.txt', dtype=str)
 
-if not os.path.exists('./data/word_indices.json'):
+if os.path.exists('./data/word_indices.json'):
+    with open('./data/word_indices.json', 'r') as f:
+        word_indices = json.load(f)
+else:
     with open('./data/word_indices.json', 'w') as f:
         word_indices = {word: i for i, word in enumerate(all_words)}
         json.dump(word_indices, f)
@@ -26,23 +30,12 @@ NUM_POSSIBLE = len(possible_words)
 
 def main():
     # Get pattern matrix (check if already saved in file first)
-    if os.path.exists('./data/pattern_matrix.npy'):
-        pattern_matrix = np.load('./data/pattern_matrix.npy')
-    else:
-        pattern_matrix = generate_pattern_matrix(all_words, all_words)
-        np.save('./data/pattern_matrix.npy', pattern_matrix)
-
-    # Get entropies (check if already saved in file first)
-    if os.path.exists('./data/entropies.json'):
-        with open('./data/entropies.json', 'r') as f:
-            entropies = json.load(f)
-    else:
-        entropies = {}
-        for i, word in enumerate(all_words):
-            entropies[word] = get_entropy(i, pattern_matrix)
-        
-        with open('./data/entropies.json', 'w') as f:
-            json.dump(entropies, f)
+    # if os.path.exists('./data/pattern_matrix.npy'):
+    #     pattern_matrix = np.load('./data/pattern_matrix.npy')
+    # else:
+    #     pattern_matrix = generate_pattern_matrix(all_words, all_words)
+    #     np.save('./data/pattern_matrix.npy', pattern_matrix)
+    # pattern_matrix = get_pattern_matrix(all_words, all_words)
 
     # Get relative frequencies
     frequencies = {}
@@ -53,10 +46,26 @@ def main():
         print("Need relative word frequency data")
         return
 
-    sorted_by_freqs = sorted(frequencies.keys(), key=frequencies.get)
+    # Get entropies (check if already saved in file first)
+    if os.path.exists('./data/initial_entropies.json'):
+        with open('./data/initial_entropies.json', 'r') as f:
+            entropies = json.load(f)
+    else:
+        # entropies = {}
+        # for i, word in enumerate(all_words):
+        #     entropies[word] = get_entropy(i, pattern_matrix)
 
-    # entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
-    # print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
+        freq_probs = get_freq_probs(frequencies)
+        weights = get_weights(all_words, freq_probs)
+        distributions = get_distributions(all_words, all_words, weights)
+        entropies = get_entropy_with_freqs(distributions)
+        entropies = {all_words[i]: entropies[i] for i in range(len(all_words))}
+        
+        with open('./data/initial_entropies.json', 'w') as f:
+            json.dump(entropies, f)
+
+    entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
+    print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
     
     return
 
@@ -133,6 +142,20 @@ def generate_pattern_matrix(words1, words2):
 
     return pattern_matrix
 
+def get_pattern_matrix(words1, words2):
+    words1_indices = [word_indices[word] for word in words1]
+    words2_indices = [word_indices[word] for word in words2]
+
+    if os.path.exists('./data/pattern_matrix.npy'):
+        pattern_matrix = np.load('./data/pattern_matrix.npy')
+    else:
+        pattern_matrix = generate_pattern_matrix(all_words, all_words)
+        np.save('./data/pattern_matrix.npy', pattern_matrix)
+    
+    return pattern_matrix[np.ix_(words1_indices, words2_indices)]
+
+# Calculates entropy for a given guess from pattern matrix
+# Only considers potential answers given by remaining indices
 def get_entropy(guess, pattern_matrix, remaining_indices=None):
     patterns = pattern_matrix[guess, remaining_indices]
     patterns, counts = np.unique(patterns, return_counts=True)
@@ -144,15 +167,36 @@ def sigmoid(x):
 
 # Possible cutoff point at line 6489 (PIKER) of sorted_by_freqs.txt, BASSY (next word) not in solutions
 def get_freq_probs(freqs, n=3000, width=10):
-    sorted_words = sorted(freqs.keys, key=freqs.get)
+    sorted_words = sorted(freqs.keys(), key=freqs.get)
     center = width * ( -0.5 + (n / len(sorted_words)) )
     linspace = np.linspace(center - width / 2, center + width / 2, len(sorted_words))
 
-    probs = {}
+    freq_probs = {}
     for word, x in zip(sorted_words, linspace):
-        probs[word] = sigmoid(x)
+        freq_probs[word.upper()] = sigmoid(x)
     
-    return probs
+    return freq_probs
+
+def get_weights(remaining_words, freq_probs):
+    weights = np.array([freq_probs[str(word)] for word in remaining_words])
+    total = weights.sum()
+    return weights / total if total != 0 else np.zeros(weights.shape)
+
+def get_distributions(all_words, remaining_words, weights):
+    # Distributions holds the probability distributions of each word's patterns
+    # Rows - allowed words (same order as pattern matrix), Cols - patterns
+    distributions = np.zeros( (len(all_words), 3**5) )
+    pattern_matrix = get_pattern_matrix(all_words, remaining_words)
+
+    n = np.arange(len(all_words))
+    for i, weight in enumerate(weights):
+        distributions[n, pattern_matrix[:,i]] += weight
+
+    return distributions
+
+def get_entropy_with_freqs(distributions):  
+    axis = len(distributions.shape) - 1
+    return entropy(distributions, base=2, axis=axis)
 
 
 

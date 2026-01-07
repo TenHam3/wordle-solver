@@ -12,7 +12,6 @@ from simulator import *
 # nth letter, [letter], [color]
 # color = "correct" (green), "present in another position" (yellow), "absent" (gray)
 
-test_words = np.loadtxt('./data/test.txt', dtype=str)
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
 possible_words = np.loadtxt('./data/solutions.txt', dtype=str)
 
@@ -177,20 +176,23 @@ def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
     guesses = set()
     entropies_copy = entropies.copy() 
     score = 0
+    win = False
     for i in range(6):
             score += 1
             candidates = {w: e for w, e in entropies_copy.items() if w not in guesses}
             suggested_guess = max(candidates, key=candidates.get)
             user_guess = ""
+
+            # Get user guess
             while len(user_guess) != 5 or user_guess.upper() not in all_words:
                 user_guess = input(f"Enter a guess (suggested best guess is {suggested_guess}): ")
                 if len(user_guess) != 5:
                     print("Please enter a 5-letter word")
                 elif user_guess.upper() not in all_words:
                     print("Not a valid word")
-            
             guesses.add(user_guess)
 
+            # Get pattern user got from Wordle
             pattern = ""
             allowed_chars = {"G", "g", "Y", "y", "X", "x"}
             diff = {}
@@ -202,6 +204,7 @@ def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
                 elif diff:
                     print("Please input a valid pattern given from Wordle feedback (G/g - green, Y/y - yellow, X/x - gray)")
 
+            # Convert pattern to ternary string
             pattern = list(pattern)
             for j in range(len(pattern)):
                 c = pattern[j]
@@ -218,6 +221,7 @@ def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
 
             if pattern_int == 242: # 242 means pattern is all 2's (green) so they guessed correctly
                 print(f"Solved! The word was {user_guess.upper()}.")
+                win = True
                 break
 
             # Filter possible words based on the pattern
@@ -241,8 +245,8 @@ def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
             for word in possible_words_filtered:
                 idx = word_indices[word]
                 entropies_copy[word] = get_entropy(idx, pattern_matrix, possible_indices)
-    
-    return score
+
+    return score if win else -1
 
 if __name__ == "__main__":
     main()
