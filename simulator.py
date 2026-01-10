@@ -13,7 +13,6 @@ import os
 from scipy.stats import entropy
 from wordle import *
 
-test_words = np.loadtxt('./data/test.txt', dtype=str)
 all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
 possible_words = np.loadtxt('./data/solutions.txt', dtype=str)
 

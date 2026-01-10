@@ -91,13 +91,3 @@ def simulate_game(word, guesses):
         return evaluations, len(guesses)
     else:
         return evaluations, len(guesses) + 1  # +1 for failure
-
-# word = "AAHED"
-# guess = "AALII" 
-# evaluation = word_eval(word, guess)
-# pattern_int = string_to_pattern_int(evaluation)
-# pattern_string = pattern_int_to_string(pattern_int)
-# print(f"Word: {word}, Guess: {guess}, Evaluation: {evaluation}")
-# print(f"Pattern Int: {pattern_int}")
-# print(f"Pattern String: {pattern_string}")
-# print(f"Emoji Pattern: {get_emoji_pattern(pattern_int)}")

@@ -12,12 +12,6 @@ from simulator import *
 # nth letter, [letter], [color]
 # color = "correct" (green), "present in another position" (yellow), "absent" (gray)
 
-all_words = np.loadtxt('./data/allowed_words.txt', dtype=str)
-possible_words = np.loadtxt('./data/solutions.txt', dtype=str)
-
-NUM_ALLOWED = len(all_words)
-NUM_POSSIBLE = len(possible_words)
-
 def main():
     if os.path.exists('./data/word_indices.json'):
         with open('./data/word_indices.json', 'r') as f:
@@ -41,6 +35,23 @@ def main():
         print("Need to generate entropies first. Run simulator.py")
         return
     
+    response = ""
+    allowed = {"1", "2"}
+
+    while response not in allowed:
+        print("1) Solver Assistant Mode")
+        print("2) Test Bot Against All Words")
+        response = input("Which would want: ")
+    
+    match response:
+        case "1":
+            # Test manually from user-given Wordle feedback
+            play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
+
+        case "2":
+            # Test against all words
+            simulate_all_games_bot(pattern_matrix, entropies, word_indices)
+
     # Test bot against a random or particular word
     # answer = random.choice(possible_words)
     # answer = "FLOAT"
@@ -50,11 +61,6 @@ def main():
     # answer = random.choice(possible_words)
     # answer = "OOMPH"
     # play_game_piloted(answer, pattern_matrix, entropies, word_indices)
-
-    # Test manually from user-given Wordle feedback
-    # play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
-
-    simulate_all_games_bot(pattern_matrix, entropies, word_indices)
 
 def play_game_bot(answer, pattern_matrix, entropies, word_indices):
     print(f"Answer is {answer}")
@@ -308,6 +314,8 @@ def guesses_from_entropy(entropy):
 # Expected score for a word given its prob of being the answer, guess_num, and entropies
 def expected_score(prob, guess_num, curr_entropy, expected_entropy):
     return prob * guess_num + (1 - prob) * (guess_num + guesses_from_entropy(curr_entropy - expected_entropy))
+
+
 
 if __name__ == "__main__":
     main()
