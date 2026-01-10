@@ -27,43 +27,20 @@ else:
 
 NUM_ALLOWED = len(all_words)
 NUM_POSSIBLE = len(possible_words)
+PATTERN_MATRIX = None
 
 def main():
-    # Get pattern matrix (check if already saved in file first)
-    # if os.path.exists('./data/pattern_matrix.npy'):
-    #     pattern_matrix = np.load('./data/pattern_matrix.npy')
-    # else:
-    #     pattern_matrix = generate_pattern_matrix(all_words, all_words)
-    #     np.save('./data/pattern_matrix.npy', pattern_matrix)
+    # Get pattern matrix
     # pattern_matrix = get_pattern_matrix(all_words, all_words)
 
     # Get relative frequencies
-    frequencies = {}
-    if os.path.exists('./data/word_freq_updated.json'):
-        with open('./data/word_freq_updated.json', 'r') as f:
-            frequencies = json.load(f)
-    else:
-        print("Need relative word frequency data")
-        return
+    frequencies = get_freqs()
 
     # Get entropies (check if already saved in file first)
-    if os.path.exists('./data/initial_entropies.json'):
-        with open('./data/initial_entropies.json', 'r') as f:
-            entropies = json.load(f)
-    else:
-        # entropies = {}
-        # for i, word in enumerate(all_words):
-        #     entropies[word] = get_entropy(i, pattern_matrix)
-
-        freq_probs = get_freq_probs(frequencies)
-        weights = get_weights(all_words, freq_probs)
-        distributions = get_distributions(all_words, all_words, weights)
-        entropies = get_entropy_with_freqs(distributions)
-        entropies = {all_words[i]: entropies[i] for i in range(len(all_words))}
-        
-        with open('./data/initial_entropies.json', 'w') as f:
-            json.dump(entropies, f)
-
+    freq_probs = get_freq_probs(frequencies)
+    weights = get_weights(all_words, freq_probs)
+    entropies = get_entropies(all_words, all_words, weights)
+    
     entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
     print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
     
@@ -143,16 +120,18 @@ def generate_pattern_matrix(words1, words2):
     return pattern_matrix
 
 def get_pattern_matrix(words1, words2):
+    global PATTERN_MATRIX
     words1_indices = [word_indices[word] for word in words1]
     words2_indices = [word_indices[word] for word in words2]
 
-    if os.path.exists('./data/pattern_matrix.npy'):
-        pattern_matrix = np.load('./data/pattern_matrix.npy')
-    else:
-        pattern_matrix = generate_pattern_matrix(all_words, all_words)
-        np.save('./data/pattern_matrix.npy', pattern_matrix)
+    if PATTERN_MATRIX is None:
+        if os.path.exists('./data/pattern_matrix.npy'):
+            PATTERN_MATRIX = np.load('./data/pattern_matrix.npy')
+        else:
+            PATTERN_MATRIX = generate_pattern_matrix(all_words, all_words)
+            np.save('./data/pattern_matrix.npy', PATTERN_MATRIX)
     
-    return pattern_matrix[np.ix_(words1_indices, words2_indices)]
+    return PATTERN_MATRIX[np.ix_(words1_indices, words2_indices)]
 
 # Calculates entropy for a given guess from pattern matrix
 # Only considers potential answers given by remaining indices
@@ -164,6 +143,16 @@ def get_entropy(guess, pattern_matrix, remaining_indices=None):
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+def get_freqs():
+    frequencies = {}
+    if os.path.exists('./data/word_freq_updated.json'):
+        with open('./data/word_freq_updated.json', 'r') as f:
+            frequencies = json.load(f)
+    else:
+        print("Need relative word frequency data")
+        return
+    return frequencies
 
 # Possible cutoff point at line 6489 (PIKER) of sorted_by_freqs.txt, BASSY (next word) not in solutions
 def get_freq_probs(freqs, n=3000, width=10):
@@ -198,6 +187,24 @@ def get_entropy_with_freqs(distributions):
     axis = len(distributions.shape) - 1
     return entropy(distributions, base=2, axis=axis)
 
+def get_entropies(all_words, remaining_words, weights):
+    if os.path.exists('./data/initial_entropies.json'):
+        with open('./data/initial_entropies.json', 'r') as f:
+            entropies = json.load(f)
+            return entropies
+    else:
+        # entropies = {}
+        # for i, word in enumerate(all_words):
+        #     entropies[word] = get_entropy(i, pattern_matrix)
+
+        distributions = get_distributions(all_words, remaining_words, weights)
+        entropies = get_entropy_with_freqs(distributions)
+        entropies = {all_words[i]: entropies[i] for i in range(len(all_words))}
+        
+        with open('./data/initial_entropies.json', 'w') as f:
+            json.dump(entropies, f)
+        
+        return entropies
 
 
 if __name__ == "__main__":

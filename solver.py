@@ -52,30 +52,9 @@ def main():
     # play_game_piloted(answer, pattern_matrix, entropies, word_indices)
 
     # Test manually from user-given Wordle feedback
-    play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
+    # play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
 
-    # Test against all words
-    # attempt_count = {}
-    # max_attempts = 0
-    # worst_words = set()
-    # for answer in possible_words:
-    #     score = play_game(answer, pattern_matrix, entropies, word_indices)
-    #     attempt_count[score] = attempt_count.get(score, 0) + 1
-        
-    #     if score > max_attempts: 
-    #         worst_words = set()
-    #         worst_words.add(str(answer))
-    #     elif score == max_attempts:
-    #         worst_words.add(str(answer))
-        
-    #     max_attempts = max(max_attempts, score)
-
-    # print(f"Attempt distribution over all possible words:\n")
-    # keys = sorted(attempt_count.keys())
-    # for k in keys:
-    #     print(f"{k} attempts: {attempt_count[k]}")
-    
-    # print(f"Worst words were {worst_words} with {max_attempts} attempts.")
+    simulate_all_games_bot(pattern_matrix, entropies, word_indices)
 
 def play_game_bot(answer, pattern_matrix, entropies, word_indices):
     print(f"Answer is {answer}")
@@ -172,14 +151,16 @@ def play_game_piloted(answer, pattern_matrix, entropies, word_indices):
 
     return score
 
-def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
+def play_game_piloted_no_ans(pattern_matrix, initial_entropies, word_indices):
     guesses = set()
-    entropies_copy = entropies.copy() 
+    entropies = initial_entropies.copy() 
     score = 0
     win = False
+    freqs = get_freqs()
+    possible_words = all_words.copy()
     for i in range(6):
             score += 1
-            candidates = {w: e for w, e in entropies_copy.items() if w not in guesses}
+            candidates = {w: e for w, e in entropies.items() if w not in guesses}
             suggested_guess = max(candidates, key=candidates.get)
             user_guess = ""
 
@@ -225,28 +206,108 @@ def play_game_piloted_no_ans(pattern_matrix, entropies, word_indices):
                 break
 
             # Filter possible words based on the pattern
+            possible_words = []
             possible_indices = []
             guess_index = word_indices[user_guess.upper()]
             for word in all_words:
                 word_index = word_indices[word]
                 if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
+                    possible_words.append(word)
                     possible_indices.append(word_index)
             
-            possible_words_filtered = all_words[possible_indices]
             print(f"{len(candidates) - 1} possible candidates remaining.")
-            print(f"{len(possible_words_filtered)} possible solution words remaining.")
+            print(f"{len(possible_words)} possible solution words remaining.")
 
-            if len(possible_words_filtered) == 0:
+            if len(possible_words) == 0:
                 print("No possible words remaining. Something went wrong.")
                 break
 
             # Update entropies for the next guess
-            entropies_copy = {}
-            for word in possible_words_filtered:
-                idx = word_indices[word]
-                entropies_copy[word] = get_entropy(idx, pattern_matrix, possible_indices)
+            freq_probs = get_freq_probs(freqs)
+            weights = get_weights(possible_words, freq_probs)
+            distributions = get_distributions(all_words, possible_words, weights)
+            entropies = get_entropy_with_freqs(distributions)
+            entropies = {all_words[i]: entropies[i] for i in possible_indices}
 
     return score if win else -1
+
+def play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_indices):
+    print(f"Answer is {answer}")
+    guess = ""
+    i = 0
+    guesses = set()
+    entropies = initial_entropies.copy() 
+    freqs = get_freqs()
+    while guess.lower() != answer.lower():
+            candidates = {w: e for w, e in entropies.items() if w not in guesses}
+            guess = max(candidates, key=candidates.get)
+            guesses.add(guess)
+            pattern = word_eval(answer, guess)
+            pattern_int = string_to_pattern_int(pattern)
+            emoji_pattern = get_emoji_pattern(pattern_int)
+            print(f"Guess {i+1}: {guess} -> {emoji_pattern}")
+
+            if guess.lower() == answer.lower():
+                print(f"Solved! The word was {answer}.")
+                break
+
+            # Filter possible words based on the pattern
+            possible_words = []
+            possible_indices = []
+            guess_index = word_indices[guess.upper()]
+            for word in all_words:
+                word_index = word_indices[word]
+                if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
+                    possible_words.append(word)
+                    possible_indices.append(word_index)
+            
+            print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(possible_words)} possible solution words remaining.")
+
+            if len(possible_words) == 0:
+                print("No possible words remaining. Something went wrong.")
+                break
+
+            # Update entropies for the next guess
+            freq_probs = get_freq_probs(freqs)
+            weights = get_weights(possible_words, freq_probs)
+            distributions = get_distributions(all_words, possible_words, weights)
+            entropies = get_entropy_with_freqs(distributions)
+            entropies = {all_words[i]: entropies[i] for i in possible_indices}
+            
+            i += 1
+
+    return i + 1
+
+def simulate_all_games_bot(pattern_matrix, initial_entropies, word_indices):
+    attempt_count = {}
+    for answer in possible_words:
+        score = play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_indices)
+        if score not in attempt_count:
+            attempt_count[score] = {str(answer)}
+        else:
+            attempt_count[score].add(str(answer))
+
+    print(f"Attempt distribution over all possible words:\n")
+    keys = sorted(attempt_count.keys())
+    for k in keys:
+        print(f"{k} attempts: {len(attempt_count[k])}")
+    
+    max_attempts = max(attempt_count.keys())
+    worst_words = attempt_count[max_attempts]
+    print(f"Worst words were {worst_words} with {max_attempts} attempts.")
+
+# Maximize the expected score instead of expected information gain
+# E[score] = P(word) * guess_# + 
+# (1 - P(word)) * (guess_# + f(entropy after prev guess - expected entropy of word))
+
+# Regrssion-based heuristic for how many guesses remain given the entropy
+def guesses_from_entropy(entropy):
+    return 0
+
+# Expected score for a word given its prob of being the answer, guess_num, and entropies
+def expected_score(prob, guess_num, curr_entropy, expected_entropy):
+    return prob * guess_num + (1 - prob) * (guess_num + guesses_from_entropy(curr_entropy - expected_entropy))
 
 if __name__ == "__main__":
     main()
