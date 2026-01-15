@@ -35,13 +35,19 @@ def main():
     # Get relative frequencies
     frequencies = get_freqs()
 
-    # Get entropies (check if already saved in file first)
-    freq_probs = get_freq_probs(frequencies)
-    weights = get_weights(all_words, freq_probs)
-    entropies = get_entropies(all_words, all_words, weights)
-    
-    entropy_df = pd.DataFrame.from_dict(entropies, orient='index', columns=['expected_info_gain'])
-    print(entropy_df.sort_values(by='expected_info_gain', ascending=False).head(10))
+    # Get expected scores
+    if not os.path.exists('./data/initial_expected_scores.json'):
+        with open('./data/initial_expected_scores.json', 'w') as f:
+            freq_probs = get_freq_probs(frequencies)
+            weights = get_weights(all_words, freq_probs)
+            scores = get_expected_scores(all_words, all_words, weights)
+            scores = {word: float(score) for word, score in zip(all_words, scores)}
+            json.dump(scores, f)
+    else:
+        with open('./data/initial_expected_scores.json', 'r') as f:
+            scores = json.load(f)
+    score_df = pd.DataFrame.from_dict(scores, orient='index', columns=['expected_score'])
+    print(score_df.sort_values(by='expected_score', ascending=True).head(10))
     
     return
 
@@ -187,24 +193,27 @@ def get_entropy_with_freqs(distributions):
     return entropy(distributions, base=2, axis=axis)
 
 def get_entropies(all_words, remaining_words, weights):
-    if os.path.exists('./data/initial_entropies.json'):
-        with open('./data/initial_entropies.json', 'r') as f:
-            entropies = json.load(f)
-            return entropies
-    else:
-        # entropies = {}
-        # for i, word in enumerate(all_words):
-        #     entropies[word] = get_entropy(i, pattern_matrix)
+    if weights.sum() == 0:
+        return np.zeros(len(all_words))
+    distributions = get_distributions(all_words, remaining_words, weights)
+    return get_entropy_with_freqs(distributions)
 
-        distributions = get_distributions(all_words, remaining_words, weights)
-        entropies = get_entropy_with_freqs(distributions)
-        entropies = {all_words[i]: entropies[i] for i in range(len(all_words))}
-        
-        with open('./data/initial_entropies.json', 'w') as f:
-            json.dump(entropies, f)
-        
-        return entropies
+# Maximize the expected score instead of expected information gain
+# E[score] = P(word) * guess_# + 
+# (1 - P(word)) * (guess_# + f(entropy after prev guess - expected entropy of word))
 
+# Regrssion-based heuristic for how many guesses remain given the entropy (from 3B1B)
+def guesses_from_entropy(entropy):
+    min_score = 2**(-entropy) + 2 * (1 - 2**(-entropy))
+    return min_score + 1.5 * entropy / 11.5
+
+# Expected scores for remaining words given their weights/probs of being the answer
+def get_expected_scores(all_words, remaining_words, weights):
+    curr_entropy = get_entropy_with_freqs(weights)
+    expected_entropies = get_entropies(all_words, remaining_words, weights)
+    word_weights = dict(zip(remaining_words, weights))
+    probs = np.array([word_weights.get(word, 0) for word in all_words])
+    return probs + (1 - probs) * (1 + guesses_from_entropy(curr_entropy - expected_entropies))
 
 if __name__ == "__main__":
     main()

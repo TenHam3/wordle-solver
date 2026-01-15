@@ -27,30 +27,54 @@ def main():
         print("Need to generate pattern matrix first. Run simulator.py")
         return
 
-    # Get entropies (check if already saved in file first)
-    if os.path.exists('./data/entropies.json'):
-        with open('./data/entropies.json', 'r') as f:
-            entropies = json.load(f)
+    # Get expected scores (check if already saved in file first)
+    if os.path.exists('./data/initial_expected_scores.json'):
+        with open('./data/initial_expected_scores.json', 'r') as f:
+            expected_scores = json.load(f)
     else:
         print("Need to generate entropies first. Run simulator.py")
         return
     
+    freqs = get_freqs()
+
     response = ""
-    allowed = {"1", "2"}
+    allowed = {"1", "2", "3"}
 
     while response not in allowed:
         print("1) Solver Assistant Mode")
         print("2) Test Bot Against All Words")
+        print("3) Print Results")
         response = input("Which would want: ")
     
     match response:
         case "1":
             # Test manually from user-given Wordle feedback
-            play_game_piloted_no_ans(pattern_matrix, entropies, word_indices)
+            play_game_piloted_no_ans(pattern_matrix, expected_scores, word_indices, freqs)
 
         case "2":
             # Test against all words
-            simulate_all_games_bot(pattern_matrix, entropies, word_indices)
+            simulate_all_games_bot(pattern_matrix, expected_scores, word_indices, freqs)
+        case "3":
+            # Print results
+            filename = input("Enter filename that stores results: ")
+            filename = filename.strip()
+
+            if os.path.exists(f'./data/{filename}.json'):
+                with open(f'./data/{filename}.json', 'r') as f:
+                    results = json.load(f)
+                    print(f"Attempt distribution over all possible words:\n")
+                    keys = sorted([int(k) for k in results.keys()])
+                    for k in keys:
+                        print(f"{k} attempts: {len(results[str(k)])}")
+                    
+                    print("")
+                    for i in range(max(keys) - 3, max(keys) + 1):
+                        worst_words = results[str(i)]
+                        print(f"Worst words for {i} attempts: {worst_words}\n")
+                
+            else:
+                print("File not found.")
+                
 
     # Test bot against a random or particular word
     # answer = random.choice(possible_words)
@@ -157,17 +181,16 @@ def play_game_piloted(answer, pattern_matrix, entropies, word_indices):
 
     return score
 
-def play_game_piloted_no_ans(pattern_matrix, initial_entropies, word_indices):
+def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indices, freqs):
     guesses = set()
-    entropies = initial_entropies.copy() 
     score = 0
     win = False
-    freqs = get_freqs()
-    possible_words = all_words.copy()
+    word_scores = initial_expected_scores.copy()
+
     for i in range(6):
             score += 1
-            candidates = {w: e for w, e in entropies.items() if w not in guesses}
-            suggested_guess = max(candidates, key=candidates.get)
+            candidates = {w: s for w, s in word_scores.items() if w not in guesses}
+            suggested_guess = min(candidates, key=candidates.get)
             user_guess = ""
 
             # Get user guess
@@ -177,6 +200,7 @@ def play_game_piloted_no_ans(pattern_matrix, initial_entropies, word_indices):
                     print("Please enter a 5-letter word")
                 elif user_guess.upper() not in all_words:
                     print("Not a valid word")
+            user_guess = user_guess.upper()            
             guesses.add(user_guess)
 
             # Get pattern user got from Wordle
@@ -207,19 +231,19 @@ def play_game_piloted_no_ans(pattern_matrix, initial_entropies, word_indices):
             print(f"Guess {i+1}: {user_guess} -> {emoji_pattern}")
 
             if pattern_int == 242: # 242 means pattern is all 2's (green) so they guessed correctly
-                print(f"Solved! The word was {user_guess.upper()}.")
+                print(f"Solved! The word was {user_guess}.")
                 win = True
                 break
 
             # Filter possible words based on the pattern
             possible_words = []
-            possible_indices = []
-            guess_index = word_indices[user_guess.upper()]
+            possible_indices = set()
+            guess_index = word_indices[user_guess]
             for word in all_words:
                 word_index = word_indices[word]
                 if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
                     possible_words.append(word)
-                    possible_indices.append(word_index)
+                    possible_indices.add(word_index)
             
             print(f"{len(candidates) - 1} possible candidates remaining.")
             print(f"{len(possible_words)} possible solution words remaining.")
@@ -231,27 +255,26 @@ def play_game_piloted_no_ans(pattern_matrix, initial_entropies, word_indices):
             # Update entropies for the next guess
             freq_probs = get_freq_probs(freqs)
             weights = get_weights(possible_words, freq_probs)
-            distributions = get_distributions(all_words, possible_words, weights)
-            entropies = get_entropy_with_freqs(distributions)
-            entropies = {all_words[i]: entropies[i] for i in possible_indices}
+            expected_scores = get_expected_scores(all_words, possible_words, weights)
+            word_scores = {all_words[i]: expected_scores[i] for i in range(len(all_words)) if i in possible_indices}
 
     return score if win else -1
 
-def play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_indices):
+def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs):
     print(f"Answer is {answer}")
     guess = ""
-    i = 0
+    score = 1
     guesses = set()
-    entropies = initial_entropies.copy() 
-    freqs = get_freqs()
+    word_scores = initial_expected_scores.copy()
+    
     while guess.lower() != answer.lower():
-            candidates = {w: e for w, e in entropies.items() if w not in guesses}
-            guess = max(candidates, key=candidates.get)
+            candidates = {w: s for w, s in word_scores.items() if w not in guesses}
+            guess = min(candidates, key=candidates.get)
             guesses.add(guess)
             pattern = word_eval(answer, guess)
             pattern_int = string_to_pattern_int(pattern)
             emoji_pattern = get_emoji_pattern(pattern_int)
-            print(f"Guess {i+1}: {guess} -> {emoji_pattern}")
+            print(f"Guess {score}: {guess} -> {emoji_pattern}")
 
             if guess.lower() == answer.lower():
                 print(f"Solved! The word was {answer}.")
@@ -259,13 +282,13 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_ind
 
             # Filter possible words based on the pattern
             possible_words = []
-            possible_indices = []
-            guess_index = word_indices[guess.upper()]
+            possible_indices = set()
+            guess_index = word_indices[guess]
             for word in all_words:
                 word_index = word_indices[word]
                 if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
                     possible_words.append(word)
-                    possible_indices.append(word_index)
+                    possible_indices.add(word_index)
             
             print(f"{len(candidates) - 1} possible candidates remaining.")
             print(f"{len(possible_words)} possible solution words remaining.")
@@ -277,18 +300,19 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_ind
             # Update entropies for the next guess
             freq_probs = get_freq_probs(freqs)
             weights = get_weights(possible_words, freq_probs)
-            distributions = get_distributions(all_words, possible_words, weights)
-            entropies = get_entropy_with_freqs(distributions)
-            entropies = {all_words[i]: entropies[i] for i in possible_indices}
+            expected_scores = get_expected_scores(all_words, possible_words, weights)
+            word_scores = {all_words[i]: expected_scores[i] for i in range(len(all_words)) if i in possible_indices}
             
-            i += 1
+            score += 1
 
-    return i + 1
+    return score
 
-def simulate_all_games_bot(pattern_matrix, initial_entropies, word_indices):
+def simulate_all_games_bot(pattern_matrix, initial_expected_scores, word_indices, freqs):
+    filename = input("Enter filename to store results: ")
+    filename = filename.strip()
     attempt_count = {}
     for answer in possible_words:
-        score = play_game_bot_with_freqs(answer, pattern_matrix, initial_entropies, word_indices)
+        score = play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs)
         if score not in attempt_count:
             attempt_count[score] = {str(answer)}
         else:
@@ -303,18 +327,9 @@ def simulate_all_games_bot(pattern_matrix, initial_entropies, word_indices):
     worst_words = attempt_count[max_attempts]
     print(f"Worst words were {worst_words} with {max_attempts} attempts.")
 
-# Maximize the expected score instead of expected information gain
-# E[score] = P(word) * guess_# + 
-# (1 - P(word)) * (guess_# + f(entropy after prev guess - expected entropy of word))
-
-# Regrssion-based heuristic for how many guesses remain given the entropy
-def guesses_from_entropy(entropy):
-    return 0
-
-# Expected score for a word given its prob of being the answer, guess_num, and entropies
-def expected_score(prob, guess_num, curr_entropy, expected_entropy):
-    return prob * guess_num + (1 - prob) * (guess_num + guesses_from_entropy(curr_entropy - expected_entropy))
-
+    with open(f'./data/{filename}.json', 'w') as f:
+        results = {k: list(v) for k, v in attempt_count.items()}
+        json.dump(results, f)
 
 
 if __name__ == "__main__":
