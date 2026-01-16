@@ -2,6 +2,7 @@
 Solver application for user to utilize during a Wordle game
 '''
 
+from ast import pattern
 import numpy as np
 import os
 import random
@@ -38,12 +39,13 @@ def main():
     freqs = get_freqs()
 
     response = ""
-    allowed = {"1", "2", "3"}
+    allowed = {"1", "2", "3", "4"}
 
     while response not in allowed:
         print("1) Solver Assistant Mode")
-        print("2) Test Bot Against All Words")
-        print("3) Print Results")
+        print("2) Test Bot Against Particular Word")
+        print("3) Test Bot Against All Words")
+        print("4) Print Results")
         response = input("Which would want: ")
     
     match response:
@@ -51,10 +53,36 @@ def main():
             # Test manually from user-given Wordle feedback
             play_game_piloted_no_ans(pattern_matrix, expected_scores, word_indices, freqs)
 
+        # Test GONER, COXED, MOLLY, AXING
         case "2":
-            # Test against all words
-            simulate_all_games_bot(pattern_matrix, expected_scores, word_indices, freqs)
+            # Test bot against user input word
+            answer = ""
+            while len(answer) != 5 or answer not in possible_words:
+                answer = input("Enter the word to test the bot against: ").strip().upper()
+                if len(answer) != 5:
+                    print("Please enter a 5-letter word")
+                elif answer.upper() not in possible_words:
+                    print("Not a valid word")
+
+            cheating = ""
+            allowed_chars = {"Y", "y", "N", "n"}
+            while cheating not in allowed_chars:
+                cheating = input("Do you want to cheat (Y/y - Yes, N/n - No): ")
+            cheating = cheating.upper() == 'Y'
+
+            play_game_bot_with_freqs(answer, pattern_matrix, expected_scores, word_indices, freqs, cheating=cheating)
+
         case "3":
+            # Test against all words
+            cheating = ""
+            allowed_chars = {"Y", "y", "N", "n"}
+            while cheating not in allowed_chars:
+                cheating = input("Do you want to cheat (Y/y - Yes, N/n - No): ")
+            cheating = cheating.upper() == 'Y'
+
+            simulate_all_games_bot(pattern_matrix, expected_scores, word_indices, freqs, cheating=cheating)
+
+        case "4":
             # Print results
             filename = input("Enter filename that stores results: ")
             filename = filename.strip()
@@ -68,9 +96,13 @@ def main():
                         print(f"{k} attempts: {len(results[str(k)])}")
                     
                     print("")
-                    for i in range(max(keys) - 3, max(keys) + 1):
-                        worst_words = results[str(i)]
-                        print(f"Worst words for {i} attempts: {worst_words}\n")
+                    # for i in range(max(keys) - 3, max(keys) + 1):
+                    #     worst_words = results[str(i)]
+                    #     print(f"Worst words for {i} attempts: {worst_words}\n")
+                    
+                    total = sum(len(results[str(k)]) for k in keys)
+                    average = sum(k * len(results[str(k)]) for k in keys) / total
+                    print(f"Average number of attempts over all possible words: {average:.4f}")
                 
             else:
                 print("File not found.")
@@ -185,17 +217,23 @@ def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indic
     guesses = set()
     score = 0
     win = False
-    word_scores = initial_expected_scores.copy()
+    word_scores = initial_expected_scores.copy() # Expected scores
+    remaining_words = all_words.copy()
+    # freq_probs = get_freq_probs(freqs)
+    # weights = get_weights(all_words, freq_probs) # Probs
+    # entropies = get_entropies(all_words, all_words, weights) # Entropies
 
     for i in range(6):
             score += 1
+            # Need to aggregate expected score, entropy, and probability of being answer
             candidates = {w: s for w, s in word_scores.items() if w not in guesses}
-            suggested_guess = min(candidates, key=candidates.get)
+            suggested_guesses = sorted(candidates, key=candidates.get)
             user_guess = ""
 
             # Get user guess
             while len(user_guess) != 5 or user_guess.upper() not in all_words:
-                user_guess = input(f"Enter a guess (suggested best guess is {suggested_guess}): ")
+                print(f"Top 10 suggested guesses: {suggested_guesses[:10]}")
+                user_guess = input(f"\nEnter a guess: ")
                 if len(user_guess) != 5:
                     print("Please enter a 5-letter word")
                 elif user_guess.upper() not in all_words:
@@ -236,40 +274,60 @@ def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indic
                 break
 
             # Filter possible words based on the pattern
-            possible_words = []
-            possible_indices = set()
+            new_remaining_words = []
+            remaining_indices = set()
             guess_index = word_indices[user_guess]
             for word in all_words:
                 word_index = word_indices[word]
-                if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
-                    possible_words.append(word)
-                    possible_indices.add(word_index)
-            
-            print(f"{len(candidates) - 1} possible candidates remaining.")
-            print(f"{len(possible_words)} possible solution words remaining.")
+                if pattern_matrix[guess_index, word_index] == pattern_int and word in remaining_words:
+                    new_remaining_words.append(word)
+                    remaining_indices.add(word_index)
+            remaining_words = new_remaining_words
 
-            if len(possible_words) == 0:
+            print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(remaining_words)} possible solution words remaining.")
+            if len(remaining_words) == 0:
                 print("No possible words remaining. Something went wrong.")
                 break
 
             # Update entropies for the next guess
             freq_probs = get_freq_probs(freqs)
-            weights = get_weights(possible_words, freq_probs)
-            expected_scores = get_expected_scores(all_words, possible_words, weights)
-            word_scores = {all_words[i]: expected_scores[i] for i in range(len(all_words)) if i in possible_indices}
+            weights = get_weights(remaining_words, freq_probs)
+            expected_scores = get_expected_scores(all_words, remaining_words, weights)
+            word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
 
     return score if win else -1
 
-def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs):
+def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs, cheating=False):
     print(f"Answer is {answer}")
     guess = ""
     score = 1
     guesses = set()
     word_scores = initial_expected_scores.copy()
+    remaining_words = list(all_words.copy())
+    freq_probs = get_freq_probs(freqs)
+    weights = get_weights(remaining_words, freq_probs)
+    possible_answers = set(possible_words)
     
     while guess.lower() != answer.lower():
             candidates = {w: s for w, s in word_scores.items() if w not in guesses}
             guess = min(candidates, key=candidates.get)
+            
+            if score > 1:
+                pattern_probs = get_distributions(remaining_words, remaining_words, weights)
+                idx = remaining_words.index(guess)
+
+                # Switch to probe guessing if there is a dominant pattern
+                if (max(pattern_probs[idx]) > 0.4 and 
+                    ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
+                    # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
+                    print(f"Using probe guessing for guess {score}")
+                    freq_probs = get_freq_probs(freqs)
+                    weights = get_weights(remaining_words, freq_probs)
+                    entropies = get_entropies(all_words, remaining_words, weights)
+                    candidates = {w: e for w, e in zip(all_words, entropies) if w not in guesses}
+                    guess = max(candidates, key=candidates.get)
+            
             guesses.add(guess)
             pattern = word_eval(answer, guess)
             pattern_int = string_to_pattern_int(pattern)
@@ -281,38 +339,41 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
                 break
 
             # Filter possible words based on the pattern
-            possible_words = []
-            possible_indices = set()
+            new_remaining_words = []
+            remaining_indices = set()
             guess_index = word_indices[guess]
             for word in all_words:
                 word_index = word_indices[word]
-                if pattern_matrix[guess_index, word_index] == pattern_int and word in candidates:
-                    possible_words.append(word)
-                    possible_indices.add(word_index)
-            
-            print(f"{len(candidates) - 1} possible candidates remaining.")
-            print(f"{len(possible_words)} possible solution words remaining.")
+                if (pattern_matrix[guess_index, word_index] == pattern_int and 
+                    ((cheating and word in possible_answers) or (not cheating and word in remaining_words))):
+                    new_remaining_words.append(str(word))
+                    remaining_indices.add(word_index)
+            remaining_words = new_remaining_words
+            possible_answers = possible_answers.intersection(set(remaining_words))
 
-            if len(possible_words) == 0:
+            # print(f"{len(candidates) - 1} possible candidates remaining.")
+            print(f"{len(remaining_words)} possible solution words remaining.")
+
+            if len(remaining_words) == 0:
                 print("No possible words remaining. Something went wrong.")
                 break
 
             # Update entropies for the next guess
             freq_probs = get_freq_probs(freqs)
-            weights = get_weights(possible_words, freq_probs)
-            expected_scores = get_expected_scores(all_words, possible_words, weights)
-            word_scores = {all_words[i]: expected_scores[i] for i in range(len(all_words)) if i in possible_indices}
-            
+            weights = get_weights(remaining_words, freq_probs)
+            expected_scores = get_expected_scores(all_words, remaining_words, weights)
+            word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
+
             score += 1
 
     return score
 
-def simulate_all_games_bot(pattern_matrix, initial_expected_scores, word_indices, freqs):
+def simulate_all_games_bot(pattern_matrix, initial_expected_scores, word_indices, freqs, cheating=False):
     filename = input("Enter filename to store results: ")
     filename = filename.strip()
     attempt_count = {}
     for answer in possible_words:
-        score = play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs)
+        score = play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, word_indices, freqs, cheating=cheating)
         if score not in attempt_count:
             attempt_count[score] = {str(answer)}
         else:

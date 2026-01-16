@@ -200,7 +200,7 @@ def get_entropies(all_words, remaining_words, weights):
 
 # Maximize the expected score instead of expected information gain
 # E[score] = P(word) * guess_# + 
-# (1 - P(word)) * (guess_# + f(entropy after prev guess - expected entropy of word))
+# (1 - P(word)) * (guess_# + f(entropy of curr distribution - expected entropy of word))
 
 # Regrssion-based heuristic for how many guesses remain given the entropy (from 3B1B)
 def guesses_from_entropy(entropy):
