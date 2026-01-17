@@ -51,9 +51,14 @@ def main():
     match response:
         case "1":
             # Test manually from user-given Wordle feedback
-            play_game_piloted_no_ans(pattern_matrix, expected_scores, word_indices, freqs)
+            cheating = ""
+            allowed_chars = {"Y", "y", "N", "n"}
+            while cheating not in allowed_chars:
+                cheating = input("Do you want to cheat (Y/y - Yes, N/n - No): ")
+            cheating = cheating.upper() == 'Y'
 
-        # Test GONER, COXED, MOLLY, AXING
+            play_game_assistant_mode(pattern_matrix, expected_scores, word_indices, freqs, cheating=cheating)
+
         case "2":
             # Test bot against user input word
             answer = ""
@@ -213,56 +218,43 @@ def play_game_piloted(answer, pattern_matrix, entropies, word_indices):
 
     return score
 
-def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indices, freqs):
+def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indices, freqs, cheating=False):
     guesses = set()
     score = 0
     win = False
     word_scores = initial_expected_scores.copy() # Expected scores
     remaining_words = all_words.copy()
-    # freq_probs = get_freq_probs(freqs)
-    # weights = get_weights(all_words, freq_probs) # Probs
-    # entropies = get_entropies(all_words, all_words, weights) # Entropies
+    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
+    weights = get_weights(remaining_words, freq_probs) # Probs
+    # entropies = get_entropies(all_words, remaining_words, weights) # Entropies
+    possible_answers = set(possible_words)
 
     for i in range(6):
             score += 1
             # Need to aggregate expected score, entropy, and probability of being answer
             candidates = {w: s for w, s in word_scores.items() if w not in guesses}
             suggested_guesses = sorted(candidates, key=candidates.get)
-            user_guess = ""
+            best_guess = suggested_guesses[0]
 
+            if score > 1:
+                pattern_probs = get_distributions(remaining_words, remaining_words, weights)
+                idx = remaining_words.index(best_guess)
+
+                # Switch to probe guessing if there is a dominant pattern
+                if (max(pattern_probs[idx]) > 0.4 and 
+                    ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
+                    # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
+                    print(f"Using probe guessing for guess {score}")
+                    entropies = get_entropies(all_words, remaining_words, weights)
+                    candidates = {str(w): e for w, e in zip(all_words, entropies) if w not in guesses}
+                    suggested_guesses = sorted(candidates, key=candidates.get, reverse=True)
+            
             # Get user guess
-            while len(user_guess) != 5 or user_guess.upper() not in all_words:
-                print(f"Top 10 suggested guesses: {suggested_guesses[:10]}")
-                user_guess = input(f"\nEnter a guess: ")
-                if len(user_guess) != 5:
-                    print("Please enter a 5-letter word")
-                elif user_guess.upper() not in all_words:
-                    print("Not a valid word")
-            user_guess = user_guess.upper()            
+            user_guess = get_user_guess(suggested_guesses)
             guesses.add(user_guess)
 
             # Get pattern user got from Wordle
-            pattern = ""
-            allowed_chars = {"G", "g", "Y", "y", "X", "x"}
-            diff = {}
-            while len(pattern) != 5 or diff:
-                pattern = input("Provide the color pattern given by Wordle (G/g - green, Y/y - yellow, X/x - gray): ")
-                diff = set(pattern) - allowed_chars
-                if len(pattern) != 5:
-                    print("Please enter a pattern of length 5")
-                elif diff:
-                    print("Please input a valid pattern given from Wordle feedback (G/g - green, Y/y - yellow, X/x - gray)")
-
-            # Convert pattern to ternary string
-            pattern = list(pattern)
-            for j in range(len(pattern)):
-                c = pattern[j]
-                if c.upper() == 'G':
-                    pattern[j] = EXACT
-                elif c.upper() == 'Y':
-                    pattern[j] = MISPLACED
-                else:
-                    pattern[j] = MISS
+            pattern = get_wordle_feedback()
 
             pattern_int = string_to_pattern_int(pattern)
             emoji_pattern = get_emoji_pattern(pattern_int)
@@ -279,10 +271,12 @@ def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indic
             guess_index = word_indices[user_guess]
             for word in all_words:
                 word_index = word_indices[word]
-                if pattern_matrix[guess_index, word_index] == pattern_int and word in remaining_words:
-                    new_remaining_words.append(word)
+                if (pattern_matrix[guess_index, word_index] == pattern_int and 
+                    ((cheating and word in possible_answers) or (not cheating and word in remaining_words))):
+                    new_remaining_words.append(str(word))
                     remaining_indices.add(word_index)
             remaining_words = new_remaining_words
+            possible_answers = possible_answers.intersection(set(remaining_words))
 
             print(f"{len(candidates) - 1} possible candidates remaining.")
             print(f"{len(remaining_words)} possible solution words remaining.")
@@ -291,7 +285,7 @@ def play_game_piloted_no_ans(pattern_matrix, initial_expected_scores, word_indic
                 break
 
             # Update entropies for the next guess
-            freq_probs = get_freq_probs(freqs)
+            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
             weights = get_weights(remaining_words, freq_probs)
             expected_scores = get_expected_scores(all_words, remaining_words, weights)
             word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
@@ -323,7 +317,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
                     # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
                     print(f"Using probe guessing for guess {score}")
                     entropies = get_entropies(all_words, remaining_words, weights)
-                    candidates = {w: e for w, e in zip(all_words, entropies) if w not in guesses}
+                    candidates = {str(w): e for w, e in zip(all_words, entropies) if w not in guesses}
                     guess = max(candidates, key=candidates.get)
             
             guesses.add(guess)
@@ -390,6 +384,42 @@ def simulate_all_games_bot(pattern_matrix, initial_expected_scores, word_indices
         results = {k: list(v) for k, v in attempt_count.items()}
         json.dump(results, f)
 
+def get_user_guess(suggested_guesses):
+    user_guess = ""
+    while len(user_guess) != 5 or user_guess.upper() not in all_words:
+        print(f"Top 10 suggested guesses: {suggested_guesses[:10]}")
+        user_guess = input(f"\nEnter a guess: ").strip()
+        if len(user_guess) != 5:
+            print("Please enter a 5-letter word")
+        elif user_guess.upper() not in all_words:
+            print("Not a valid word")
+    return user_guess.upper() 
+
+def get_wordle_feedback():
+    pattern = ""
+    allowed_chars = {"G", "g", "Y", "y", "X", "x"}
+    diff = {}
+    while len(pattern) != 5 or diff:
+        pattern = input("Provide the color pattern given by Wordle (G/g - green, Y/y - yellow, X/x - gray): ").strip()
+        diff = set(pattern) - allowed_chars
+        if len(pattern) != 5:
+            print("Please enter a pattern of length 5")
+        elif diff:
+            print("Please input a valid pattern given from Wordle feedback (G/g - green, Y/y - yellow, X/x - gray)")
+    
+    # Convert pattern to ternary string
+    pattern = pattern.upper()
+    pattern = list(pattern)
+    for j in range(len(pattern)):
+        c = pattern[j]
+        if c == 'G':
+            pattern[j] = EXACT
+        elif c == 'Y':
+            pattern[j] = MISPLACED
+        else:
+            pattern[j] = MISS
+    
+    return pattern
 
 if __name__ == "__main__":
     main()
