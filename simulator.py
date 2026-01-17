@@ -47,7 +47,10 @@ def main():
         with open('./data/initial_expected_scores.json', 'r') as f:
             scores = json.load(f)
     score_df = pd.DataFrame.from_dict(scores, orient='index', columns=['expected_score'])
-    print(score_df.sort_values(by='expected_score', ascending=True).head(10))
+    print(score_df.sort_values(by='expected_score', ascending=True).head(50))
+    # score_df_over_4 = score_df[score_df['expected_score'] > 4].sort_values(by='expected_score', ascending=True)
+    # print(score_df_over_4)
+    # print(len(score_df_over_4))
     
     return
 
@@ -214,6 +217,16 @@ def get_expected_scores(all_words, remaining_words, weights):
     word_weights = dict(zip(remaining_words, weights))
     probs = np.array([word_weights.get(word, 0) for word in all_words])
     return probs + (1 - probs) * (1 + guesses_from_entropy(curr_entropy - expected_entropies))
+
+def get_cheat_freq_probs():
+    if os.path.exists('./data/cheat_freq_probs.json'):
+        with open('./data/cheat_freq_probs.json', 'r') as f:
+            freq_probs = json.load(f)
+    else:
+        freq_probs = {str(w): int(w in possible_words) for w in all_words}
+        with open('./data/cheat_freq_probs.json', 'w') as f:
+            json.dump(freq_probs, f)
+    return freq_probs
 
 if __name__ == "__main__":
     main()

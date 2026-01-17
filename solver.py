@@ -305,7 +305,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
     guesses = set()
     word_scores = initial_expected_scores.copy()
     remaining_words = list(all_words.copy())
-    freq_probs = get_freq_probs(freqs)
+    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
     weights = get_weights(remaining_words, freq_probs)
     possible_answers = set(possible_words)
     
@@ -322,8 +322,6 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
                     ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
                     # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
                     print(f"Using probe guessing for guess {score}")
-                    freq_probs = get_freq_probs(freqs)
-                    weights = get_weights(remaining_words, freq_probs)
                     entropies = get_entropies(all_words, remaining_words, weights)
                     candidates = {w: e for w, e in zip(all_words, entropies) if w not in guesses}
                     guess = max(candidates, key=candidates.get)
@@ -359,7 +357,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
                 break
 
             # Update entropies for the next guess
-            freq_probs = get_freq_probs(freqs)
+            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
             weights = get_weights(remaining_words, freq_probs)
             expected_scores = get_expected_scores(all_words, remaining_words, weights)
             word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
