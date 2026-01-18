@@ -232,22 +232,9 @@ def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indic
     for i in range(6):
             score += 1
             # Need to aggregate expected score, entropy, and probability of being answer
-            candidates = {w: s for w, s in word_scores.items() if w not in guesses}
-            suggested_guesses = sorted(candidates, key=candidates.get)
-            best_guess = suggested_guesses[0]
-
-            if score > 1:
-                pattern_probs = get_distributions(remaining_words, remaining_words, weights)
-                idx = remaining_words.index(best_guess)
-
-                # Switch to probe guessing if there is a dominant pattern
-                if (max(pattern_probs[idx]) > 0.4 and 
-                    ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
-                    # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
-                    print(f"Using probe guessing for guess {score}")
-                    entropies = get_entropies(all_words, remaining_words, weights)
-                    candidates = {str(w): e for w, e in zip(all_words, entropies) if w not in guesses}
-                    suggested_guesses = sorted(candidates, key=candidates.get, reverse=True)
+            
+            # Get suggested guesses
+            suggested_guesses = get_suggested_guesses(word_scores, guesses, score, remaining_words, possible_answers, weights, cheating=cheating)
             
             # Get user guess
             user_guess = get_user_guess(suggested_guesses)
@@ -266,19 +253,9 @@ def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indic
                 break
 
             # Filter possible words based on the pattern
-            new_remaining_words = []
-            remaining_indices = set()
-            guess_index = word_indices[user_guess]
-            for word in all_words:
-                word_index = word_indices[word]
-                if (pattern_matrix[guess_index, word_index] == pattern_int and 
-                    ((cheating and word in possible_answers) or (not cheating and word in remaining_words))):
-                    new_remaining_words.append(str(word))
-                    remaining_indices.add(word_index)
-            remaining_words = new_remaining_words
-            possible_answers = possible_answers.intersection(set(remaining_words))
+            remaining_words, remaining_indices, possible_answers = filter_possible_words(user_guess, pattern_matrix, pattern_int, remaining_words, possible_answers, cheating=cheating)
 
-            print(f"{len(candidates) - 1} possible candidates remaining.")
+            # print(f"{len(candidates) - 1} possible candidates remaining.")
             print(f"{len(remaining_words)} possible solution words remaining.")
             if len(remaining_words) == 0:
                 print("No possible words remaining. Something went wrong.")
@@ -304,21 +281,8 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
     possible_answers = set(possible_words)
     
     while guess.lower() != answer.lower():
-            candidates = {w: s for w, s in word_scores.items() if w not in guesses}
-            guess = min(candidates, key=candidates.get)
-            
-            if score > 1:
-                pattern_probs = get_distributions(remaining_words, remaining_words, weights)
-                idx = remaining_words.index(guess)
-
-                # Switch to probe guessing if there is a dominant pattern
-                if (max(pattern_probs[idx]) > 0.4 and 
-                    ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
-                    # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
-                    print(f"Using probe guessing for guess {score}")
-                    entropies = get_entropies(all_words, remaining_words, weights)
-                    candidates = {str(w): e for w, e in zip(all_words, entropies) if w not in guesses}
-                    guess = max(candidates, key=candidates.get)
+            suggested_guesses = suggested_guesses = get_suggested_guesses(word_scores, guesses, score, remaining_words, possible_answers, weights, cheating=cheating)
+            guess = suggested_guesses[0]
             
             guesses.add(guess)
             pattern = word_eval(answer, guess)
@@ -334,17 +298,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
             score += 1
 
             # Filter possible words based on the pattern
-            new_remaining_words = []
-            remaining_indices = set()
-            guess_index = word_indices[guess]
-            for word in all_words:
-                word_index = word_indices[word]
-                if (pattern_matrix[guess_index, word_index] == pattern_int and 
-                    ((cheating and word in possible_answers) or (not cheating and word in remaining_words))):
-                    new_remaining_words.append(str(word))
-                    remaining_indices.add(word_index)
-            remaining_words = new_remaining_words
-            possible_answers = possible_answers.intersection(set(remaining_words))
+            remaining_words, remaining_indices, possible_answers = filter_possible_words(guess, pattern_matrix, pattern_int, remaining_words, possible_answers, cheating=cheating)
 
             # print(f"{len(candidates) - 1} possible candidates remaining.")
             print(f"{len(remaining_words)} possible solution words remaining.")
@@ -384,6 +338,25 @@ def simulate_all_games_bot(pattern_matrix, initial_expected_scores, word_indices
     with open(f'./data/{filename}.json', 'w') as f:
         results = {k: list(v) for k, v in attempt_count.items()}
         json.dump(results, f)
+def get_suggested_guesses(word_scores, guesses, score, remaining_words, possible_answers, weights, cheating=False):
+    candidates = {w: s for w, s in word_scores.items() if w not in guesses}
+    suggested_guesses = sorted(candidates, key=candidates.get)
+    best_guess = suggested_guesses[0]
+
+    if score > 1:
+        pattern_probs = get_distributions(remaining_words, remaining_words, weights)
+        idx = remaining_words.index(best_guess)
+
+        # Switch to probe guessing if there is a dominant pattern
+        if (max(pattern_probs[idx]) > 0.4 and 
+            ((cheating and len(possible_answers) > 2) or (not cheating and len(remaining_words) > 2))):
+            # Get entropies of all_words vs possible_words, next guess is max entropy over possible words
+            print(f"Using probe guessing for guess {score}")
+            entropies = get_entropies(all_words, remaining_words, weights)
+            candidates = {str(w): e for w, e in zip(all_words, entropies) if w not in guesses}
+            suggested_guesses = sorted(candidates, key=candidates.get, reverse=True)
+    
+    return suggested_guesses
 
 def get_user_guess(suggested_guesses):
     user_guess = ""
@@ -421,6 +394,20 @@ def get_wordle_feedback():
             pattern[j] = MISS
     
     return pattern
+
+def filter_possible_words(guess, pattern_matrix, pattern_int, remaining_words, possible_answers, cheating=False):
+    new_remaining_words = []
+    remaining_indices = set()
+    guess_index = word_indices[guess]
+    for word in all_words:
+        word_index = word_indices[word]
+        if (pattern_matrix[guess_index, word_index] == pattern_int and 
+            ((cheating and word in possible_answers) or (not cheating and word in remaining_words))):
+            new_remaining_words.append(str(word))
+            remaining_indices.add(word_index)
+    remaining_words = new_remaining_words
+    possible_answers = possible_answers.intersection(set(remaining_words))
+    return remaining_words, remaining_indices, possible_answers
 
 if __name__ == "__main__":
     main()

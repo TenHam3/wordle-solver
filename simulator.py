@@ -47,10 +47,9 @@ def main():
         with open('./data/initial_expected_scores.json', 'r') as f:
             scores = json.load(f)
     score_df = pd.DataFrame.from_dict(scores, orient='index', columns=['expected_score'])
-    print(score_df.sort_values(by='expected_score', ascending=True).head(50))
-    # score_df_over_4 = score_df[score_df['expected_score'] > 4].sort_values(by='expected_score', ascending=True)
-    # print(score_df_over_4)
-    # print(len(score_df_over_4))
+    # print(score_df.sort_values(by='expected_score', ascending=True).head(50))
+    score_df_over_4 = score_df[score_df['expected_score'] > 4].sort_values(by='expected_score', ascending=True)
+    print(np.random.choice(score_df_over_4.index, size=10, replace=False))
     
     return
 
@@ -218,6 +217,7 @@ def get_expected_scores(all_words, remaining_words, weights):
     probs = np.array([word_weights.get(word, 0) for word in all_words])
     return probs + (1 - probs) * (1 + guesses_from_entropy(curr_entropy - expected_entropies))
 
+# Uniform distribution over all possible remaining words derived from solution set
 def get_cheat_freq_probs(turn_num, remaining_words=None):
     if os.path.exists('./data/cheat_freq_probs.json') and turn_num == 1:
         with open('./data/cheat_freq_probs.json', 'r') as f:
@@ -227,7 +227,7 @@ def get_cheat_freq_probs(turn_num, remaining_words=None):
         with open('./data/cheat_freq_probs.json', 'w') as f:
             json.dump(freq_probs, f)
     else:
-        freq_probs = {w: int(w in remaining_words) for w in remaining_words}
+        freq_probs = {w: int(w in possible_words) for w in remaining_words}
     return freq_probs
 
 if __name__ == "__main__":
