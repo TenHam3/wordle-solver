@@ -224,7 +224,7 @@ def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indic
     win = False
     word_scores = initial_expected_scores.copy() # Expected scores
     remaining_words = all_words.copy()
-    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
+    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs(1)
     weights = get_weights(remaining_words, freq_probs) # Probs
     # entropies = get_entropies(all_words, remaining_words, weights) # Entropies
     possible_answers = set(possible_words)
@@ -285,7 +285,7 @@ def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indic
                 break
 
             # Update entropies for the next guess
-            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
+            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs(score + 1, remaining_words)
             weights = get_weights(remaining_words, freq_probs)
             expected_scores = get_expected_scores(all_words, remaining_words, weights)
             word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
@@ -299,7 +299,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
     guesses = set()
     word_scores = initial_expected_scores.copy()
     remaining_words = list(all_words.copy())
-    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
+    freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs(1)
     weights = get_weights(remaining_words, freq_probs)
     possible_answers = set(possible_words)
     
@@ -329,6 +329,9 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
             if guess.lower() == answer.lower():
                 print(f"Solved! The word was {answer}.")
                 break
+            
+            # Increment score if not solved yet
+            score += 1
 
             # Filter possible words based on the pattern
             new_remaining_words = []
@@ -351,12 +354,10 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, wo
                 break
 
             # Update entropies for the next guess
-            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs()
+            freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs(score, remaining_words)
             weights = get_weights(remaining_words, freq_probs)
             expected_scores = get_expected_scores(all_words, remaining_words, weights)
             word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
-
-            score += 1
 
     return score
 

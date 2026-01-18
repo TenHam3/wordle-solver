@@ -218,14 +218,16 @@ def get_expected_scores(all_words, remaining_words, weights):
     probs = np.array([word_weights.get(word, 0) for word in all_words])
     return probs + (1 - probs) * (1 + guesses_from_entropy(curr_entropy - expected_entropies))
 
-def get_cheat_freq_probs():
-    if os.path.exists('./data/cheat_freq_probs.json'):
+def get_cheat_freq_probs(turn_num, remaining_words=None):
+    if os.path.exists('./data/cheat_freq_probs.json') and turn_num == 1:
         with open('./data/cheat_freq_probs.json', 'r') as f:
             freq_probs = json.load(f)
-    else:
+    elif turn_num == 1:
         freq_probs = {str(w): int(w in possible_words) for w in all_words}
         with open('./data/cheat_freq_probs.json', 'w') as f:
             json.dump(freq_probs, f)
+    else:
+        freq_probs = {w: int(w in remaining_words) for w in remaining_words}
     return freq_probs
 
 if __name__ == "__main__":
