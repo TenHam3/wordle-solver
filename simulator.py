@@ -14,16 +14,9 @@ from generate_data import *
 # color = "correct" (green), "present in another position" (yellow), "absent" (gray)
 
 def main():
-    # Get expected scores (check if already saved in file first)
-    if os.path.exists('./data/initial_expected_scores.json'):
-        with open('./data/initial_expected_scores.json', 'r') as f:
-            expected_scores = json.load(f)
-    else:
-        print("Need to generate entropies first. Run generate_data.py")
-        return
-    
     pattern_matrix = get_pattern_matrix(all_words, all_words)
     freqs = get_freqs()
+    expected_scores = get_initial_expected_scores(freqs)
 
     response = ""
     allowed = {"1", "2", "3", "4"}
@@ -271,11 +264,12 @@ def play_game_assistant_mode(pattern_matrix, initial_expected_scores, word_indic
 
     return score if win else -1
 
-def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, freqs, starting_word=None, cheating=False):
-    print(f"Answer is {answer}")
+def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, freqs, starting_word=None, cheating=False, discord=False):
+    if not discord: print(f"Answer is {answer}")
     guess = ""
     score = 1
-    guesses = set()
+    guesses = []
+    patterns = []
     word_scores = initial_expected_scores.copy()
     remaining_words = list(all_words.copy())
     freq_probs = get_freq_probs(freqs) if not cheating else get_cheat_freq_probs(1)
@@ -286,14 +280,15 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, fr
             suggested_guesses = get_suggested_guesses(word_scores, guesses, score, remaining_words, possible_answers, weights, cheating=cheating)
             guess = starting_word if score == 1 and starting_word is not None else suggested_guesses[0]
             
-            guesses.add(guess)
+            guesses.append(guess)
             pattern = word_eval(answer, guess)
             pattern_int = string_to_pattern_int(pattern)
             emoji_pattern = get_emoji_pattern(pattern_int)
-            print(f"Guess {score}: {guess} -> {emoji_pattern}")
+            patterns.append(emoji_pattern)
+            if not discord: print(f"Guess {score}: {guess} -> {emoji_pattern}")
 
             if guess.lower() == answer.lower():
-                print(f"Solved! The word was {answer}.")
+                if not discord: print(f"Solved! The word was {answer}.")
                 break
             
             # Increment score if not solved yet
@@ -303,10 +298,10 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, fr
             remaining_words, remaining_indices, possible_answers = filter_possible_words(guess, pattern_matrix, pattern_int, remaining_words, possible_answers, cheating=cheating)
 
             # print(f"{len(candidates) - 1} possible candidates remaining.")
-            print(f"{len(remaining_words)} possible solution words remaining.")
+            if not discord: print(f"{len(remaining_words)} possible solution words remaining.")
 
             if len(remaining_words) == 0:
-                print("No possible words remaining. Something went wrong.")
+                if not discord: print("No possible words remaining. Something went wrong.")
                 break
 
             # Update entropies for the next guess
@@ -315,7 +310,7 @@ def play_game_bot_with_freqs(answer, pattern_matrix, initial_expected_scores, fr
             expected_scores = get_expected_scores(all_words, remaining_words, weights)
             word_scores = {str(all_words[i]): expected_scores[i] for i in range(len(all_words)) if i in remaining_indices}
 
-    return score
+    return score if not discord else (score, guesses, patterns)
 
 def simulate_all_games_bot(pattern_matrix, initial_expected_scores, freqs, cheating=False):
     filename = input("Enter filename to store results: ")

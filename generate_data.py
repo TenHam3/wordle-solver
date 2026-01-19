@@ -36,16 +36,7 @@ def main():
     frequencies = get_freqs()
 
     # Get expected scores
-    if not os.path.exists('./data/initial_expected_scores.json'):
-        with open('./data/initial_expected_scores.json', 'w') as f:
-            freq_probs = get_freq_probs(frequencies)
-            weights = get_weights(all_words, freq_probs)
-            scores = get_expected_scores(all_words, all_words, weights)
-            scores = {word: float(score) for word, score in zip(all_words, scores)}
-            json.dump(scores, f)
-    else:
-        with open('./data/initial_expected_scores.json', 'r') as f:
-            scores = json.load(f)
+    scores = get_initial_expected_scores(frequencies)
     
     score_df = pd.DataFrame.from_dict(scores, orient='index', columns=['expected_score'])
     # print(score_df.sort_values(by='expected_score', ascending=False).head(50))
@@ -218,6 +209,19 @@ def get_expected_scores(all_words, remaining_words, weights):
     probs = np.array([word_weights.get(word, 0) for word in all_words])
     return probs + (1 - probs) * (1 + guesses_from_entropy(curr_entropy - expected_entropies))
 
+def get_initial_expected_scores(frequencies):
+    if not os.path.exists('./data/initial_expected_scores.json'):
+        with open('./data/initial_expected_scores.json', 'w') as f:
+            freq_probs = get_freq_probs(frequencies)
+            weights = get_weights(all_words, freq_probs)
+            scores = get_expected_scores(all_words, all_words, weights)
+            scores = {word: float(score) for word, score in zip(all_words, scores)}
+            json.dump(scores, f)
+    else:
+        with open('./data/initial_expected_scores.json', 'r') as f:
+            scores = json.load(f)
+    return scores
+
 # Uniform distribution over all possible remaining words derived from solution set
 def get_cheat_freq_probs(turn_num, remaining_words=None):
     if os.path.exists('./data/cheat_freq_probs.json') and turn_num == 1:
@@ -263,6 +267,9 @@ def two_step_expected_scores():
     #     with open('./data/2step_initial_scores.json', 'r') as f:
     #         scores = json.load(f)
     return
+
+def generate_random_words(n):
+    return np.random.choice(all_words, size=n, replace=False).tolist()
 
 if __name__ == "__main__":
     main()
