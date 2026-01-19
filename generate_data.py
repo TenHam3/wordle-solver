@@ -46,8 +46,9 @@ def main():
     else:
         with open('./data/initial_expected_scores.json', 'r') as f:
             scores = json.load(f)
+    
     score_df = pd.DataFrame.from_dict(scores, orient='index', columns=['expected_score'])
-    # print(score_df.sort_values(by='expected_score', ascending=True).head(50))
+    # print(score_df.sort_values(by='expected_score', ascending=False).head(50))
     score_df_over_4 = score_df[score_df['expected_score'] > 4].sort_values(by='expected_score', ascending=True)
     print(np.random.choice(score_df_over_4.index, size=10, replace=False))
     
@@ -229,6 +230,39 @@ def get_cheat_freq_probs(turn_num, remaining_words=None):
     else:
         freq_probs = {w: int(w in possible_words) for w in remaining_words}
     return freq_probs
+
+def two_step_expected_scores():
+    # if not os.path.exists('./data/2step_initial_scores.json'):
+    #     with open('./data/2step_initial_scores.json', 'w') as f:
+            # Iterate through all allowed words
+            # for word in all_words:
+
+            # avg = 0
+
+                # Iterate through all patterns
+                # for pattern in range(3**5):
+
+                    # Filter possible words by pattern
+                    # remaining_words = 
+
+                    # Get expected scores for that pattern
+                    # expected_scores = get_expected_scores(all_words, remaining_words, weights)
+
+                    # Select best candidate from expected scores
+                    # best = min(expected_scores)
+
+                    # avg += best
+
+                # Average over all expected scores from each pattern
+                # avg /= 3**5
+
+                # Assign average expected score to that word
+                # scores[word] = avg
+
+    # else:
+    #     with open('./data/2step_initial_scores.json', 'r') as f:
+    #         scores = json.load(f)
+    return
 
 if __name__ == "__main__":
     main()

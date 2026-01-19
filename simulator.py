@@ -360,10 +360,11 @@ def get_suggested_guesses(word_scores, guesses, score, remaining_words, possible
     
     return suggested_guesses
 
-def get_user_guess(suggested_guesses):
+def get_user_guess(suggested_guesses=None):
     user_guess = ""
     while len(user_guess) != 5 or user_guess.upper() not in all_words:
-        print(f"Top 10 suggested guesses: {suggested_guesses[:10]}")
+        if suggested_guesses is not None: 
+            print(f"Top 10 suggested guesses: {suggested_guesses[:10]}")
         user_guess = input(f"\nEnter a guess: ").strip()
         if len(user_guess) != 5:
             print("Please enter a 5-letter word")
